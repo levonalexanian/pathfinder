@@ -110,6 +110,15 @@ make test-ml        # Python tests
 
 Scenarios use the `.pfmap` format (`learning/pathfinder_ml/grid.py`): a dense, already-inflated occupancy grid plus solvable start/goal queries. Every planner sees identical inputs, and every returned path is checked for collisions, adjacency and endpoints.
 
+### CUDA planners
+
+`bench/gpu/gpu_planners.cu` adds two exact GPU planners on the same 26-connected grid, run by `pf_bench` as `cuda_wavefront` and `cuda_frontier`. Both are built automatically when a CUDA compiler is present.
+
+- **Tiled wavefront:** in-place Bellman-Ford over the whole grid. Each 8^3 tile (plus halo) relaxes to a local fixed point in shared memory before writing back, so one launch moves the wavefront up to 8 voxels. It yields the full cost-to-goal field, which answers every start for that goal.
+- **Frontier, A*-pruned:** sparse label-correcting search from the goal. Only voxels whose cost improved are expanded next, via `atomicMin` on the float bits with stamp de-duplication. Voxels with `g + h >= cost(start)` are pruned. The Euclidean heuristic is consistent, so the result stays optimal.
+
+Both extract the path on the GPU by descending the cost field, and return the same cost as A* on every benchmark query.
+
 ## Layout
 
 ```
@@ -117,7 +126,7 @@ src/
 ├── algorithms/   pathfinder_algo_{astar,dijkstra,dstar_lite,rrt}
 ├── robots/       pathfinder_robot_{car,drone}
 └── infra/        pathfinder_{msgs,core,bringup,rerun}
-bench/            ROS-free C++ benchmark harness
+bench/            ROS-free C++ benchmark harness + CUDA planners (bench/gpu)
 learning/         Python tooling (pathfinder_ml): grids, scenarios, PyTorch GPU planner
 docker/           GPU workbench image
 ```
