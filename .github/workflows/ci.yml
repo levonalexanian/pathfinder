@@ -35,3 +35,30 @@ jobs:
           source /opt/ros/jazzy/setup.bash
           colcon test --return-code-on-test-failure
         shell: bash
+
+  bench-and-ml:
+    # CPU-only check of the ROS-free benchmark harness and the Python tooling.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config liboctomap-dev
+          pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.14.1"
+          pip install "numpy>=1.26,<3" "pytest>=8,<9"
+      - name: Python tests
+        run: PYTHONPATH=learning python -m pytest -q learning/tests
+      - name: Build benchmark harness
+        run: cmake -S bench -B bench/build -G Ninja && cmake --build bench/build
+      - name: Benchmark smoke test
+        run: |
+          ./bench/build/pf_export_bt maps/demo_world.bt bench/build/demo_world.pfmap
+          PYTHONPATH=learning python -m pathfinder_ml.scenarios --quick --queries 2 \
+            --out bench/build/scenarios --demo bench/build/demo_world.pfmap
+          ./bench/build/pf_bench --algos astar,dijkstra,dstar_lite --repeats 1 \
+            --out bench/build/smoke.jsonl bench/build/scenarios/*.pfmap
+          ! grep -q '"success":false' bench/build/smoke.jsonl
