@@ -15,8 +15,11 @@ jobs:
         run: |
           apt-get update
           apt-get install -y cmake ninja-build python3-pip python3-colcon-common-extensions \
-            ros-jazzy-octomap-msgs ros-jazzy-octomap-ros
+            ros-jazzy-octomap-msgs ros-jazzy-octomap-ros python3-numpy python3-pytest \
+            python3-attr python3-pil python3-psutil
           pip install "conan>=2,<3" --break-system-packages
+          pip install "pyarrow==21.0.0" "typing-extensions>=4.5" --break-system-packages
+          pip install --no-deps "rerun-sdk==0.40.0" --break-system-packages
       - name: Conan profile
         run: conan profile detect --force
       - name: Conan install
