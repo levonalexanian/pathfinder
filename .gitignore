@@ -17,7 +17,3 @@ __pycache__/
 # Environment
 .env
 
-# Foxglove user layouts
-foxglove/layouts/*.json
-!foxglove/layouts/car.json
-!foxglove/layouts/drone.json
