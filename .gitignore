@@ -17,3 +17,8 @@ __pycache__/
 # Environment
 .env
 
+# Benchmark / learning outputs (regenerate with make scenarios / bench / train)
+bench/build/
+bench/scenarios/
+bench/results/*.jsonl
+learning/runs/
