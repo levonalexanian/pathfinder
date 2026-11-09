@@ -62,3 +62,20 @@ jobs:
           ./bench/build/pf_bench --algos astar,dijkstra,dstar_lite --repeats 1 \
             --out bench/build/smoke.jsonl bench/build/scenarios/*.pfmap
           ! grep -q '"success":false' bench/build/smoke.jsonl
+
+  cuda-build:
+    # Compile-only check of the CUDA planners (no GPU on the runner).
+    runs-on: ubuntu-24.04
+    container:
+      image: nvidia/cuda:13.0.2-devel-ubuntu24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install deps
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake ninja-build pkg-config g++ liboctomap-dev
+      - name: Build with CUDA
+        run: |
+          cmake -S bench -B bench/build -G Ninja
+          cmake --build bench/build
+          test -f bench/build/libpf_gpu.a

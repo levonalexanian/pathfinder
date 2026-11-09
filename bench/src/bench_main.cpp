@@ -1,5 +1,5 @@
-// Runs the CPU planner cores over .pfmap scenarios and writes one JSON line
-// per (map, algorithm, query).
+// Runs the CPU planner cores (and the CUDA planners when built with CUDA) over
+// .pfmap scenarios and writes one JSON line per (map, algorithm, query).
 //
 //   pf_bench [--algos a,b,...] [--repeats N] [--out results.jsonl] maps/*.pfmap
 //
@@ -29,6 +29,9 @@
 
 #include "pfmap.hpp"
 
+#ifdef PF_WITH_CUDA
+#include "gpu_planners.hpp"
+#endif
 
 namespace
 {
@@ -139,7 +142,7 @@ std::vector<std::string> split(const std::string & s, char sep)
 int main(int argc, char ** argv)
 {
   std::vector<std::string> algos = {
-    "astar", "dijkstra", "dstar_lite", "rrt_star"};
+    "astar", "dijkstra", "dstar_lite", "rrt_star", "cuda_wavefront", "cuda_frontier"};
   int repeats = 3;
   std::string out_path = "bench_results.jsonl";
   std::vector<std::string> maps;
@@ -163,6 +166,15 @@ int main(int argc, char ** argv)
     return 2;
   }
 
+#ifdef PF_WITH_CUDA
+  const bool cuda_ok = pf_gpu::available();
+  std::cerr << "CUDA device: " << pf_gpu::device_name() << "\n";
+#else
+  const bool cuda_ok = false;
+  (void)cuda_ok;
+  std::cerr << "built without CUDA\n";
+#endif
+
   std::ofstream out(out_path);
   for (const auto & path : maps) {
     auto m = pf_bench::load_pfmap(path);
@@ -170,6 +182,14 @@ int main(int argc, char ** argv)
 
     std::vector<Algo> runners;
     pathfinder_algo_dstar_lite::DstarLiteCore dstar;
+#ifdef PF_WITH_CUDA
+    std::unique_ptr<pf_gpu::GpuGrid> gpu;
+    double upload_ms = 0.0;
+    if (cuda_ok) {
+      gpu = std::make_unique<pf_gpu::GpuGrid>(m.dims, m.occupied.data(), m.resolution);
+      upload_ms = gpu->upload_ms();
+    }
+#endif
     for (const auto & name : algos) {
       if (name == "astar") {
         runners.push_back({name, "cpu", [&](const VoxelIndex & s, const VoxelIndex & t) {
@@ -221,6 +241,24 @@ int main(int argc, char ** argv)
           }
           return o;
         }});
+#ifdef PF_WITH_CUDA
+      } else if ((name == "cuda_wavefront" || name == "cuda_frontier") && cuda_ok) {
+        const bool wave = name == "cuda_wavefront";
+        runners.push_back({name, "cuda", [&, wave](const VoxelIndex & s, const VoxelIndex & t) {
+          const std::array<int, 3> sa{s.x, s.y, s.z}, ta{t.x, t.y, t.z};
+          auto r = wave ? gpu->wavefront(sa, ta) : gpu->frontier(sa, ta);
+          std::vector<VoxelIndex> vp;
+          vp.reserve(r.path.size());
+          for (const auto & v : r.path) {
+            vp.push_back({v[0], v[1], v[2]});
+          }
+          auto o = from_voxels(grid, r.success, "unreachable", vp, r.work, s, t);
+          o.time_ms = r.time_ms;
+          return o;
+        }});
+#endif
+      } else if (name.rfind("cuda", 0) == 0) {
+        std::cerr << "skipping " << name << " (no CUDA device)\n";
       } else {
         std::cerr << "unknown algorithm " << name << "\n";
         return 2;
@@ -255,6 +293,11 @@ int main(int argc, char ** argv)
             << ",\"note\":\"" << json_escape(o.note) << "\",\"cost\":" << o.cost
             << ",\"path_len\":" << o.path_len << ",\"nodes\":" << o.nodes
             << ",\"time_ms\":" << o.time_ms;
+#ifdef PF_WITH_CUDA
+        if (algo.device == "cuda") {
+          out << ",\"upload_ms\":" << upload_ms;
+        }
+#endif
         out << "}\n";
         out.flush();
       }
