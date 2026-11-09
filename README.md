@@ -136,6 +136,25 @@ Both extract the path on the GPU by descending the cost field, and return the sa
 
 The trained weights are in `learning/models/ppo_planner.pt` (fp16).
 
+### Benchmark results
+
+Full report: [docs/benchmarks](docs/benchmarks/README.md). It was produced with `make bench` (`bench-cpp`, `bench-py`, `report`) on an RTX 5050 laptop. It covers 96 queries over 9 maps: the demo world, four small and two large (2.4M-voxel) random worlds, and two 3D mazes. `docs/benchmarks/demo_world_paths.rrd` is a Rerun recording of optimal vs RL paths (`make viz-paths`).
+
+- **CUDA planners are exact and fastest:**
+  - about 2.4× faster than A* across all maps (geometric mean);
+  - on the large random worlds, the A*-pruned frontier answers a query in 4–5 ms, against 37–54 ms for A*;
+  - on small maps, kernel-launch latency (~1 ms) dominates.
+- **A\*** is the best CPU planner. Dijkstra and D* Lite (first plan, from scratch) are ~5× slower.
+- **RRT\*** is fast with the shipping parameters, but:
+  - 6/96 failures, all in the mazes;
+  - 5–22% longer paths on the large worlds.
+  - Being any-angle, it can beat the 26-connected optimum slightly (ratio < 1).
+- **The PyTorch wavefront** is a correct but slow reference: dense Jacobi relaxation, ~20–900 ms.
+- **The RL policy:**
+  - Near-optimal on open worlds: 1.00–1.02× cost on the small random worlds and the demo world, 1.1–1.2× on the large ones, with 100% success there.
+  - Batched, it plans 32 queries on the demo world in 4.4 ms each.
+  - It is weak in mazes: 4/8 success and up to 4.8× cost. That is the expected limit of a reactive policy with a ~6 m view, and why the search-based planners stay the default.
+
 ## Layout
 
 ```

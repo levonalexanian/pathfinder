@@ -49,7 +49,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake ninja-build pkg-config liboctomap-dev
           pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.14.1"
-          pip install "numpy>=1.26,<3" "pytest>=8,<9"
+          pip install "numpy>=1.26,<3" "pytest>=8,<9" "matplotlib>=3.8,<4"
       - name: Python tests
         run: PYTHONPATH=learning python -m pytest -q learning/tests
       - name: Build benchmark harness

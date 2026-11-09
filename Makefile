@@ -43,7 +43,7 @@ else
   $(error Unknown SANITIZER='$(SANITIZER)'. Use one of: asan, tsan, ubsan, asan+ubsan, tsan+ubsan)
 endif
 
-.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml train
+.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml train bench-py report bench viz-paths
 
 help:
 	@echo "PathFinder make targets:"
@@ -63,6 +63,10 @@ help:
 	@echo "  bench-cpp      Benchmark the C++ planners -> bench/results/cpp.jsonl"
 	@echo "  test-ml        Run the Python tests in the GPU container"
 	@echo "  train          Train the RL planner with PPO (resumable) -> learning/runs/ppo"
+	@echo "  bench-py       Benchmark the PyTorch + RL planners -> bench/results/py.jsonl"
+	@echo "  report         Merge results into docs/benchmarks (markdown + chart)"
+	@echo "  bench          bench-cpp + bench-py + report"
+	@echo "  viz-paths      Rerun recording of optimal vs RL paths (MAP=...)"
 	@echo ""
 	@echo "  SANITIZER=<mode> on 'make build' enables a sanitizer (Debug build)."
 	@echo "    Modes: asan, tsan, ubsan, asan+ubsan, tsan+ubsan"
@@ -134,3 +138,21 @@ test-ml:
 TRAIN_ARGS ?=
 train:
 	$(GPU_RUN) python3 -m pathfinder_ml.train --out learning/runs/ppo --resume $(TRAIN_ARGS)
+
+POLICY ?= learning/models/ppo_planner.pt
+bench-py:
+	$(GPU_RUN) bash -c 'mkdir -p bench/results && python3 -m pathfinder_ml.bench_py \
+		$(if $(wildcard $(POLICY)),--policy $(POLICY),) --out bench/results/py.jsonl bench/scenarios/*.pfmap'
+
+TRAIN_METRICS ?= learning/models/ppo_planner_metrics.csv
+report:
+	$(GPU_RUN) python3 -m pathfinder_ml.report bench/results/cpp.jsonl bench/results/py.jsonl \
+		$(if $(wildcard $(TRAIN_METRICS)),--training-metrics $(TRAIN_METRICS),) \
+		--out docs/benchmarks --note "$(REPORT_NOTE)"
+
+bench: bench-cpp bench-py report
+
+MAP ?= bench/scenarios/demo_world.pfmap
+viz-paths:
+	$(GPU_RUN) bash -c 'mkdir -p bench/results && python3 -m pathfinder_ml.viz_paths $(MAP) \
+		--policy $(POLICY) --out bench/results/$(basename $(notdir $(MAP)))_paths.rrd'
