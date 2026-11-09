@@ -16,3 +16,16 @@ services:
     network_mode: host
     cap_add:
       - SYS_PTRACE
+
+  gpu:
+    build:
+      context: .
+      dockerfile: docker/gpu.Dockerfile
+    image: pathfinder-gpu
+    working_dir: /workspace
+    user: "${UID:-1000}:${GID:-1000}"
+    shm_size: 4gb
+    volumes:
+      - .:/workspace
+    environment:
+      - PYTHONPATH=/workspace/learning
