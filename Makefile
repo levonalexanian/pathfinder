@@ -43,7 +43,7 @@ else
   $(error Unknown SANITIZER='$(SANITIZER)'. Use one of: asan, tsan, ubsan, asan+ubsan, tsan+ubsan)
 endif
 
-.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean
+.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml
 
 help:
 	@echo "PathFinder make targets:"
@@ -57,10 +57,17 @@ help:
 	@echo "  sh             Open an interactive shell in the dev container"
 	@echo "  down           Stop and remove containers"
 	@echo "  clean          Stop containers and remove the local image"
+	@echo "  gpu-image      Build the CUDA + PyTorch workbench image"
+	@echo "  bench-build    Build the ROS-free benchmark harness"
+	@echo "  scenarios      Generate the benchmark scenarios (bench/scenarios)"
+	@echo "  bench-cpp      Benchmark the C++ planners -> bench/results/cpp.jsonl"
+	@echo "  test-ml        Run the Python tests in the GPU container"
 	@echo ""
 	@echo "  SANITIZER=<mode> on 'make build' enables a sanitizer (Debug build)."
 	@echo "    Modes: asan, tsan, ubsan, asan+ubsan, tsan+ubsan"
 	@echo "    Example: make build SANITIZER=asan"
+	@echo ""
+	@echo "  GPU=0 on the GPU-workbench targets runs them without a GPU."
 
 image-build:
 	$(COMPOSE) build dev
@@ -91,3 +98,33 @@ down:
 
 clean:
 	$(COMPOSE) down --rmi local --remove-orphans
+
+# ---------------------------------------------------------------------------
+# GPU workbench (CUDA planners, RL planner, benchmarks). Runs in the `gpu`
+# container. GPU=1 (default) hands the host GPU to the container, which needs
+# the NVIDIA driver + nvidia-container-toolkit; GPU=0 runs everything on CPU.
+# ---------------------------------------------------------------------------
+GPU ?= 1
+GPU_COMPOSE := $(COMPOSE) -f docker-compose.yml $(if $(filter 1,$(GPU)),-f docker-compose.gpu.yml,)
+GPU_RUN := $(GPU_COMPOSE) run --rm -T gpu
+GPU_RUN_TTY := $(GPU_COMPOSE) run --rm gpu
+
+gpu-image:
+	$(COMPOSE) build gpu
+
+gpu-sh:
+	$(GPU_RUN_TTY) bash
+
+bench-build:
+	$(GPU_RUN) bash -c 'cmake -S bench -B bench/build -G Ninja && cmake --build bench/build'
+
+scenarios: bench-build
+	$(GPU_RUN) bash -c './bench/build/pf_export_bt maps/demo_world.bt bench/build/demo_world.pfmap \
+		&& python3 -m pathfinder_ml.scenarios --out bench/scenarios --demo bench/build/demo_world.pfmap'
+
+bench-cpp: bench-build
+	$(GPU_RUN) bash -c 'mkdir -p bench/results && ./bench/build/pf_bench --out bench/results/cpp.jsonl bench/scenarios/*.pfmap'
+
+test-ml:
+	$(GPU_RUN) python3 -m pytest -q learning/tests
+

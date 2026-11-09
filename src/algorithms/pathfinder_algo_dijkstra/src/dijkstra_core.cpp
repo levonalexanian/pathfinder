@@ -11,7 +11,7 @@
 #include <vector>
 
 #include <pathfinder_core/marker_decimation.hpp>
-#include <pathfinder_core/planner_utils.hpp>
+#include <pathfinder_core/grid_utils.hpp>
 #include <pathfinder_core/voxel_grid.hpp>
 
 namespace pathfinder_algo_dijkstra

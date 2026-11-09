@@ -1,0 +1,11 @@
+# Overlay that hands the host GPU to the `gpu` service. Needs the NVIDIA driver
+# and nvidia-container-toolkit on the host. Without them use `make ... GPU=0`.
+services:
+  gpu:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

@@ -95,13 +95,31 @@ export TSAN_OPTIONS=second_deadlock_stack=1
 
 LeakSanitizer is bundled into ASan and will likely report leaks coming from ROS 2 / Gazebo initialization that are not in your code. Silence them with `ASAN_OPTIONS=detect_leaks=0` once you've confirmed they aren't yours.
 
+## GPU workbench and benchmarks
+
+The CUDA planners, the RL planner and the benchmarks run in a second container, `gpu` (CUDA 13 + PyTorch, `docker/gpu.Dockerfile`), independent of ROS. The planner cores are built straight from `src/` by a plain CMake project in `bench/`, so the benchmark measures exactly the code the ROS nodes run.
+
+Host requirements for GPU runs: the NVIDIA driver and `nvidia-container-toolkit`. Without them, pass `GPU=0` and everything runs on the CPU.
+
+```bash
+make gpu-image      # one-time
+make scenarios      # export the demo map + generate seeded random worlds and mazes -> bench/scenarios
+make bench-cpp      # C++ planners over every scenario -> bench/results/cpp.jsonl
+make test-ml        # Python tests
+```
+
+Scenarios use the `.pfmap` format (`learning/pathfinder_ml/grid.py`): a dense, already-inflated occupancy grid plus solvable start/goal queries. Every planner sees identical inputs, and every returned path is checked for collisions, adjacency and endpoints.
+
 ## Layout
 
 ```
 src/
 ├── algorithms/   pathfinder_algo_{astar,dijkstra,dstar_lite,rrt}
 ├── robots/       pathfinder_robot_{car,drone}
-└── infra/        pathfinder_{msgs,core,bringup}
+└── infra/        pathfinder_{msgs,core,bringup,rerun}
+bench/            ROS-free C++ benchmark harness
+learning/         Python tooling (pathfinder_ml): grids, scenarios, PyTorch GPU planner
+docker/           GPU workbench image
 ```
 
 Each algorithm follows a Node/Core split: a pure C++ library (`*_core`) holds the algorithm and is unit-testable without ROS; a thin ROS Node (`*_node`) wraps it. Parameters live in `config/params.yaml` per package.
