@@ -43,7 +43,7 @@ else
   $(error Unknown SANITIZER='$(SANITIZER)'. Use one of: asan, tsan, ubsan, asan+ubsan, tsan+ubsan)
 endif
 
-.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml train bench-py report bench
+.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml train bench-py report bench viz-paths
 
 help:
 	@echo "PathFinder make targets:"
@@ -66,6 +66,7 @@ help:
 	@echo "  bench-py       Benchmark the PyTorch + RL planners -> bench/results/py.jsonl"
 	@echo "  report         Merge results into docs/benchmarks (markdown + chart)"
 	@echo "  bench          bench-cpp + bench-py + report"
+	@echo "  viz-paths      Rerun recording of optimal vs RL paths (MAP=...)"
 	@echo ""
 	@echo "  SANITIZER=<mode> on 'make build' enables a sanitizer (Debug build)."
 	@echo "    Modes: asan, tsan, ubsan, asan+ubsan, tsan+ubsan"
@@ -150,3 +151,8 @@ report:
 		--out docs/benchmarks --note "$(REPORT_NOTE)"
 
 bench: bench-cpp bench-py report
+
+MAP ?= bench/scenarios/demo_world.pfmap
+viz-paths:
+	$(GPU_RUN) bash -c 'mkdir -p bench/results && python3 -m pathfinder_ml.viz_paths $(MAP) \
+		--policy $(POLICY) --out bench/results/$(basename $(notdir $(MAP)))_paths.rrd'
