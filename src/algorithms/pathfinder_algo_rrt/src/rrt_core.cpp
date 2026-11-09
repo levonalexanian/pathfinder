@@ -56,12 +56,6 @@ public:
     tree_nodes_.push_back({p, parent_idx, cost});
   }
 
-  void update_node(int idx, int parent_idx, double cost)
-  {
-    tree_nodes_[idx].parent_idx = parent_idx;
-    tree_nodes_[idx].cost = cost;
-  }
-
   const std::vector<TreeNode> & nodes() const { return tree_nodes_; }
   std::size_t size() const { return tree_nodes_.size(); }
 
@@ -272,9 +266,21 @@ std::vector<std::pair<WorldPoint, WorldPoint>> sample_tree_edges(
   return edges;
 }
 
+// Tree path to the node that reaches the goal, plus the goal itself. The goal
+// is never a tree node, so it cannot become an ancestor of its own parent.
+std::vector<Point3> path_to_goal(const RRTStar & rrt, int goal_parent_idx, const Point3 & goal)
+{
+  auto pts = rrt.reconstruct_from(goal_parent_idx);
+  if (pts.empty() || distance(pts.back(), goal) > 1e-9) {
+    pts.push_back(goal);
+  }
+  return pts;
+}
+
 RRTFeedback build_feedback(
   const RRTStar & rrt,
-  int best_goal_idx,
+  int goal_parent_idx,
+  const Point3 & goal,
   double best_cost,
   const pathfinder_core::InflatedVoxelGrid & grid)
 {
@@ -285,8 +291,8 @@ RRTFeedback build_feedback(
     : std::numeric_limits<double>::infinity();
 
   std::vector<Point3> best_path;
-  if (best_goal_idx >= 0) {
-    best_path = rrt.reconstruct_from(best_goal_idx);
+  if (goal_parent_idx >= 0) {
+    best_path = path_to_goal(rrt, goal_parent_idx, goal);
     fb.best_partial_path = path_to_voxels(best_path, grid);
     fb.best_partial_path_world = path_to_world_points(best_path);
   }
@@ -331,7 +337,10 @@ RRTResult RRTCore::plan(
 
   rrt.add_node(start_pt, -1, 0.0);
 
-  int best_goal_idx = -1;
+  // The goal is tracked by the tree node that connects to it rather than added
+  // as a node: as a node it could gain children, and re-parenting it onto one
+  // of its own descendants later created a parent cycle that hung the planner.
+  int goal_parent_idx = -1;
   double best_cost = std::numeric_limits<double>::infinity();
   int iter = 0;
   int iter_at_first_goal = -1;
@@ -344,7 +353,7 @@ RRTResult RRTCore::plan(
     if (elapsed - slept_sec >= params.max_plan_time_sec) {
       break;
     }
-    if (best_goal_idx >= 0 &&
+    if (goal_parent_idx >= 0 &&
         (iter - iter_at_first_goal) >= params.min_iterations_after_goal)
     {
       break;
@@ -382,16 +391,10 @@ RRTResult RRTCore::plan(
     {
       const double candidate_cost = cost_to_new + distance(x_new, goal_pt);
       if (candidate_cost < best_cost) {
-        if (best_goal_idx < 0) {
-          rrt.add_node(goal_pt, new_idx, candidate_cost);
-          best_goal_idx = static_cast<int>(rrt.size()) - 1;
+        if (goal_parent_idx < 0) {
           iter_at_first_goal = iter;
-        } else {
-          // Rewire the existing goal node instead of appending a duplicate.
-          // nearest()/neighbors_within() scan the full tree, so a second goal
-          // node at the same position would corrupt those queries.
-          rrt.update_node(best_goal_idx, new_idx, candidate_cost);
         }
+        goal_parent_idx = new_idx;
         best_cost = candidate_cost;
       }
     }
@@ -399,7 +402,7 @@ RRTResult RRTCore::plan(
     const double since_feedback =
       std::chrono::duration<double>(now_t - last_feedback).count();
     if (feedback && ((iter % 100) == 0 || since_feedback >= 0.2)) {
-      feedback(build_feedback(rrt, best_goal_idx, best_cost, grid));
+      feedback(build_feedback(rrt, goal_parent_idx, goal_pt, best_cost, grid));
       if (params.viz_delay_ms > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(params.viz_delay_ms));
         slept_sec += params.viz_delay_ms / 1000.0;
@@ -412,14 +415,14 @@ RRTResult RRTCore::plan(
   const double total_ms = std::chrono::duration<double, std::milli>(t_end - t_start).count();
 
   if (feedback) {
-    feedback(build_feedback(rrt, best_goal_idx, best_cost, grid));
+    feedback(build_feedback(rrt, goal_parent_idx, goal_pt, best_cost, grid));
   }
 
   result.plan_duration_ms = total_ms;
   result.nodes_expanded = static_cast<int>(rrt.size());
 
-  if (best_goal_idx >= 0) {
-    auto pts = rrt.reconstruct_from(best_goal_idx);
+  if (goal_parent_idx >= 0) {
+    const auto pts = path_to_goal(rrt, goal_parent_idx, goal_pt);
     result.path_world = path_to_world_points(pts);
     result.path = path_to_voxels(pts, grid);
     result.success = true;
