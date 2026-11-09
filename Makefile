@@ -43,7 +43,7 @@ else
   $(error Unknown SANITIZER='$(SANITIZER)'. Use one of: asan, tsan, ubsan, asan+ubsan, tsan+ubsan)
 endif
 
-.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml
+.PHONY: help image-build install build test generate-map launch-car launch-drone sh down clean gpu-image gpu-sh bench-build scenarios bench-cpp test-ml train
 
 help:
 	@echo "PathFinder make targets:"
@@ -62,6 +62,7 @@ help:
 	@echo "  scenarios      Generate the benchmark scenarios (bench/scenarios)"
 	@echo "  bench-cpp      Benchmark the C++ planners -> bench/results/cpp.jsonl"
 	@echo "  test-ml        Run the Python tests in the GPU container"
+	@echo "  train          Train the RL planner with PPO (resumable) -> learning/runs/ppo"
 	@echo ""
 	@echo "  SANITIZER=<mode> on 'make build' enables a sanitizer (Debug build)."
 	@echo "    Modes: asan, tsan, ubsan, asan+ubsan, tsan+ubsan"
@@ -128,3 +129,8 @@ bench-cpp: bench-build
 test-ml:
 	$(GPU_RUN) python3 -m pytest -q learning/tests
 
+
+# PPO training of the RL planner; resumable (re-run after an interruption).
+TRAIN_ARGS ?=
+train:
+	$(GPU_RUN) python3 -m pathfinder_ml.train --out learning/runs/ppo --resume $(TRAIN_ARGS)

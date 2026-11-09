@@ -119,6 +119,23 @@ Scenarios use the `.pfmap` format (`learning/pathfinder_ml/grid.py`): a dense, a
 
 Both extract the path on the GPU by descending the cost field, and return the same cost as A* on every benchmark query.
 
+### RL planner
+
+`learning/pathfinder_ml` trains a neural planner with PPO (`make train`). Training is resumable, and its curves are logged to `learning/runs/ppo/metrics.csv` and a Rerun recording, `train.rrd`.
+
+- **Environment (`env.py`):** thousands of agents step through a bank of procedurally generated worlds and 3D mazes at once, entirely on the GPU. An agent moves one voxel per step, choosing among 26 moves; moves into blocked voxels are masked out.
+- **Observation:** egocentric, so the policy works on maps of any size:
+  - a 15³ local occupancy window,
+  - a 15³ window at 4× coarser resolution (about 6 m of context), each with a goal channel,
+  - the goal offset.
+- **Reward:** dense shaping from the exact cost-to-goal field D, computed by the GPU wavefront and used only during training. The default, `efficiency`, is `r = α·((D(s) − D(s'))/step − 1)`, plus a goal bonus. An optimal step earns 0, and every move that makes no progress costs the same whatever its length.
+  The `excess` variant (`α·(D(s) − D(s') − step)/res`, whose return is exactly minus the extra path length) makes axis moves look cheaper than diagonals under a random walk. The policy then locks onto axis-only zig-zags: about 1.4× optimal on the demo world, against about 1.02× for `efficiency` at the same training budget.
+- **Training:** a distance curriculum, with half the map bank regenerated every 40 iterations so the policy can't memorise maps. Training seeds are disjoint from the benchmark's.
+- **Discount:** short on purpose (γ = λ = 0.9), because the shaped reward already carries the long-range signal. With γ = 0.995 the policy first collapses onto the six axis-aligned moves, which are cheaper than diagonals under a random walk, and stops improving.
+- **Planning (`rl_plan.py`):** the policy is rolled out greedily. It prefers unvisited voxels, and loops are cut from the final path. It can fail: there is no completeness guarantee, unlike the search-based planners.
+
+The trained weights are in `learning/models/ppo_planner.pt` (fp16).
+
 ## Layout
 
 ```
@@ -127,7 +144,7 @@ src/
 ├── robots/       pathfinder_robot_{car,drone}
 └── infra/        pathfinder_{msgs,core,bringup,rerun}
 bench/            ROS-free C++ benchmark harness + CUDA planners (bench/gpu)
-learning/         Python tooling (pathfinder_ml): grids, scenarios, PyTorch GPU planner
+learning/         Python tooling (pathfinder_ml): grids, scenarios, PyTorch GPU planner, RL planner
 docker/           GPU workbench image
 ```
 
