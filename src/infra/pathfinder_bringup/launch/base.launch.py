@@ -13,7 +13,8 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     map_file = LaunchConfiguration("map_file")
     default_algorithm = LaunchConfiguration("default_algorithm")
-    launch_foxglove = LaunchConfiguration("launch_foxglove")
+    launch_rerun = LaunchConfiguration("launch_rerun")
+    urdf_path = LaunchConfiguration("urdf_path")
 
     declare_use_sim_time = DeclareLaunchArgument(
         "use_sim_time", default_value="false",
@@ -27,9 +28,14 @@ def generate_launch_description():
         "default_algorithm", default_value="astar",
         description="Default planning algorithm name",
     )
-    declare_launch_foxglove = DeclareLaunchArgument(
-        "launch_foxglove", default_value="true",
-        description="Launch the foxglove_bridge node",
+    declare_launch_rerun = DeclareLaunchArgument(
+        "launch_rerun", default_value="true",
+        description="Launch the Rerun bridge (web viewer on :9090)",
+    )
+
+    declare_urdf_path = DeclareLaunchArgument(
+        "urdf_path", default_value="",
+        description="Robot URDF to show in Rerun (empty: draw a point)",
     )
 
     map_publisher = Node(
@@ -63,25 +69,26 @@ def generate_launch_description():
         }],
     )
 
-    foxglove = Node(
-        package="foxglove_bridge",
-        executable="foxglove_bridge",
-        name="foxglove_bridge",
+    rerun_bridge = Node(
+        package="pathfinder_rerun",
+        executable="rerun_bridge",
+        name="rerun_bridge",
         output="screen",
         parameters=[{
-            "port": 8765,
+            "urdf_path": urdf_path,
             "use_sim_time": use_sim_time,
         }],
-        condition=IfCondition(PythonExpression(["'", launch_foxglove, "' == 'true'"])),
+        condition=IfCondition(PythonExpression(["'", launch_rerun, "' == 'true'"])),
     )
 
     return LaunchDescription([
         declare_use_sim_time,
         declare_map_file,
         declare_default_algorithm,
-        declare_launch_foxglove,
+        declare_launch_rerun,
+        declare_urdf_path,
         map_publisher,
         voxel_map_visualizer,
         scheduler,
-        foxglove,
+        rerun_bridge,
     ])

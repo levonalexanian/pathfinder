@@ -14,7 +14,7 @@
   <exec_depend>pathfinder_algo_dijkstra</exec_depend>
   <exec_depend>pathfinder_algo_dstar_lite</exec_depend>
   <exec_depend>pathfinder_algo_rrt</exec_depend>
-  <exec_depend>foxglove_bridge</exec_depend>
+  <exec_depend>pathfinder_rerun</exec_depend>
   <exec_depend>ros2launch</exec_depend>
 
   <export>

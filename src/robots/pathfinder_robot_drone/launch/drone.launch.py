@@ -27,7 +27,7 @@ def generate_launch_description():
 
     headless = LaunchConfiguration("headless")
     default_algorithm = LaunchConfiguration("default_algorithm")
-    launch_foxglove = LaunchConfiguration("launch_foxglove")
+    launch_rerun = LaunchConfiguration("launch_rerun")
     use_sim_time = LaunchConfiguration("use_sim_time")
     map_file = LaunchConfiguration("map_file")
 
@@ -39,9 +39,9 @@ def generate_launch_description():
         "default_algorithm", default_value="astar",
         description="Default planning algorithm name",
     )
-    declare_launch_foxglove = DeclareLaunchArgument(
-        "launch_foxglove", default_value="true",
-        description="Launch the foxglove_bridge node",
+    declare_launch_rerun = DeclareLaunchArgument(
+        "launch_rerun", default_value="true",
+        description="Launch the Rerun bridge (web viewer on :9090)",
     )
     declare_use_sim_time = DeclareLaunchArgument(
         "use_sim_time", default_value="true",
@@ -65,7 +65,8 @@ def generate_launch_description():
         launch_arguments={
             "use_sim_time": use_sim_time,
             "default_algorithm": default_algorithm,
-            "launch_foxglove": launch_foxglove,
+            "launch_rerun": launch_rerun,
+            "urdf_path": os.path.join(pkg_share, "urdf", "drone.urdf"),
             "map_file": map_file,
         }.items(),
     )
@@ -144,7 +145,7 @@ def generate_launch_description():
     return LaunchDescription([
         declare_headless,
         declare_default_algorithm,
-        declare_launch_foxglove,
+        declare_launch_rerun,
         declare_use_sim_time,
         declare_map_file,
         set_resource_path,

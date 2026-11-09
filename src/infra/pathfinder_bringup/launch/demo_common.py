@@ -14,7 +14,7 @@ def make_demo_launch(robot_pkg, robot_launch_file):
 
         headless = LaunchConfiguration("headless")
         default_algorithm = LaunchConfiguration("default_algorithm")
-        launch_foxglove = LaunchConfiguration("launch_foxglove")
+        launch_rerun = LaunchConfiguration("launch_rerun")
         robot_radius = LaunchConfiguration("robot_radius")
         max_plan_time_sec = LaunchConfiguration("max_plan_time_sec")
 
@@ -26,9 +26,9 @@ def make_demo_launch(robot_pkg, robot_launch_file):
             "default_algorithm", default_value="astar",
             description="Default planning algorithm name",
         )
-        declare_launch_foxglove = DeclareLaunchArgument(
-            "launch_foxglove", default_value="true",
-            description="Launch the foxglove_bridge node",
+        declare_launch_rerun = DeclareLaunchArgument(
+            "launch_rerun", default_value="true",
+            description="Launch the Rerun bridge (web viewer on :9090)",
         )
         declare_robot_radius = DeclareLaunchArgument(
             "robot_radius", default_value="0.25",
@@ -46,7 +46,7 @@ def make_demo_launch(robot_pkg, robot_launch_file):
             launch_arguments={
                 "headless": headless,
                 "default_algorithm": default_algorithm,
-                "launch_foxglove": launch_foxglove,
+                "launch_rerun": launch_rerun,
             }.items(),
         )
 
@@ -64,7 +64,7 @@ def make_demo_launch(robot_pkg, robot_launch_file):
         return LaunchDescription([
             declare_headless,
             declare_default_algorithm,
-            declare_launch_foxglove,
+            declare_launch_rerun,
             declare_robot_radius,
             declare_max_plan_time_sec,
             robot_launch,

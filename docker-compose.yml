@@ -11,7 +11,8 @@ services:
     environment:
       - DISPLAY=${DISPLAY}
     ports:
-      - "8765:8765"
+      - "9090:9090"  # Rerun web viewer
+      - "9876:9876"  # Rerun gRPC (native viewer)
     network_mode: host
     cap_add:
       - SYS_PTRACE

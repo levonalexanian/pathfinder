@@ -1,14 +1,14 @@
 # PathFinder
 
-ROS2 Jazzy C++ showcase of four pathfinding algorithms — A\*, Dijkstra, RRT\*, D\* Lite — planning through a 3D voxel map in Gazebo Harmonic, visualized in Foxglove Studio. Two robots: a holonomic drone and a diff-drive car.
+ROS2 Jazzy C++ showcase of four pathfinding algorithms — A\*, Dijkstra, RRT\*, D\* Lite — planning through a 3D voxel map in Gazebo Harmonic, visualized in [Rerun](https://rerun.io). Two robots: a holonomic drone and a diff-drive car.
 
 ## Requirements
 
 - **Docker** with Compose
 - **make**
-- A modern web browser + a free [Foxglove account](https://app.foxglove.dev/signup)
+- A modern web browser
 
-ROS2 Jazzy, Gazebo Harmonic, Conan 2, and the C++ toolchain all run in the dev container. Foxglove Studio runs in the browser via `app.foxglove.dev` — no host install needed.
+ROS2 Jazzy, Gazebo Harmonic, Conan 2, and the C++ toolchain all run in the dev container. The Rerun web viewer is served from the container too — no host install needed.
 
 ## First-time setup
 
@@ -28,12 +28,9 @@ make launch-car     # diff-drive car
 make launch-drone   # holonomic drone
 ```
 
-Then open **https://app.foxglove.dev**:
+Then open **http://localhost:9090** for the Rerun web viewer. The `rerun_bridge` node (`pathfinder_rerun` package) logs the map, robot URDF and pose, goal, planned path, live search state and planner timings into one recording, with a default layout (3D scene, plan-duration plot, event log). Scrub the timeline to replay a plan.
 
-1. **Open connection** → **Foxglove WebSocket** → `ws://localhost:8765`
-2. **File → Import Layout** → `foxglove/layouts/car.json` or `drone.json`
-
-The URDF is fetched from GitHub raw, so the branch must be pushed for the robot mesh to render.
+Prefer the native viewer? Point it at the bridge: `rerun rerun+http://localhost:9876/proxy`. Pass `launch_rerun:=false` to skip the bridge entirely. To record a session instead, run the bridge yourself with `-p mode:=save -p save_path:=run.rrd` and open the file in any Rerun viewer.
 
 ### Send a goal
 
@@ -57,13 +54,13 @@ Dijkstra explores ~35× more nodes than A\* on the same path; D\* Lite returns n
 
 ### Watching the search
 
-While the planner runs, it publishes a `MarkerArray` on `/search_visualization` that lets you watch the algorithm think. The cubes have a 3-second lifetime, so they fade out a few seconds after planning ends.
+While the planner runs, it publishes a `MarkerArray` on `/search_visualization` that lets you watch the algorithm think. Each feedback frame replaces the previous one, and the scheduler clears the search a couple of seconds after planning ends (just before the robot starts moving); scrub back on the timeline to see any earlier frame.
 
 - **Yellow cubes** — the *open set*: voxels the algorithm is considering but hasn't expanded yet (the "frontier"). For A\* / Dijkstra / D\* Lite. For RRT\*, these are the latest tree-edge segments.
 - **Grey cubes** — the *closed set* (or "locked" for D\* Lite): voxels the algorithm has already expanded and won't revisit. Watch how Dijkstra's grey region spreads symmetrically outward while A\* leans toward the goal — that's the heuristic at work.
 - **Green line** — the current best path (`CURRENT_BEST_PATH`): refreshed each feedback frame, replaced when a better path is found.
 
-The number of cubes is capped (~500 per type per frame) so Foxglove stays responsive; the visualization is indicative, not exhaustive.
+The number of cubes is capped (~500 per type per frame) so the viewer stays responsive; the visualization is indicative, not exhaustive.
 
 ## Make targets
 
